@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="light">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora de Saldo Devedor</title>
+
+    <!-- BOOTSTRAP -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- MANIFEST PWA -->
+    <link rel="manifest" href="manifest.webmanifest">
+
+    <!-- COR DO APP NO CELULAR -->
+    <meta name="theme-color" content="#0d6efd">
+
+    <style>
+        body {
+            background: var(--bg);
+            color: var(--text);
+        }
+        :root {
+            --bg: #f4f6f9;
+            --text: #000;
+            --card-bg: #fff;
+        }
+        [data-theme="dark"] {
+            --bg: #1f1f1f;
+            --text: #e5e5e5;
+            --card-bg: #2a2a2a;
+        }
+        .card {
+            margin-top: 30px;
+            background: var(--card-bg) !important;
+        }
+        input[type="text"] {
+            text-align: right;
+        }
+
+        /* botão switch */
+        .theme-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+        }
+    </style>
+
+    <!-- ÍCONE PWA -->
+    <link rel="icon" href="icon.png">
+</head>
+<body>
+
+<!-- BOTÃO DE TEMA -->
+<button class="btn btn-secondary theme-toggle" onclick="toggleTheme()">🌗</button>
+
+<div class="container">
+    <div class="card shadow">
+        <div class="card-body">
+            <h3 class="mb-4">Calculadora de Saldo Devedor</h3>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Total de parcelas contratadas</label>
+                    <input id="totalParcelas" type="number" class="form-control" value="36">
+                </div>
+                <div class="col-md-6">
+                    <label>Parcelas restantes</label>
+                    <input id="parcelasRestantes" type="number" class="form-control" value="20">
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label>Valor da parcela (R$)</label>
+                    <input id="valorParcela" type="text" class="form-control money" value="389,50">
+                </div>
+                <div class="col-md-6">
+                    <label>Valor contratado (R$)</label>
+                    <input id="valorContratado" type="text" class="form-control money" value="10.000,00">
+                </div>
+            </div>
+
+            <button class="btn btn-primary w-100" onclick="calcular()">Calcular</button>
+
+            <button class="btn btn-success w-100 mt-2" onclick="baixarPNG()">Exportar como PNG</button>            
+
+            <hr>
+
+            <h5>Resultado</h5>
+            <p><strong>Taxa de juros mensal:</strong> <span id="taxa"></span></p>
+            <p><strong>Saldo devedor:</strong> <span id="saldo"></span></p>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script>
+    // ========== THEME MODE ==========
+    function toggleTheme() {
+        const html = document.documentElement;
+        const newTheme = html.getAttribute("data-theme") === "light" ? "dark" : "light";
+        html.setAttribute("data-theme", newTheme);
+        localStorage.setItem("theme", newTheme);
+    }
+
+    // carregar tema salvo
+    (function () {
+        const saved = localStorage.getItem("theme");
+        if (saved) document.documentElement.setAttribute("data-theme", saved);
+    })();
+
+    // --- MÁSCARA DE MOEDA ---
+    document.querySelectorAll('.money').forEach(function(el) {
+        el.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, "");
+            value = (value / 100).toFixed(2) + "";
+            value = value.replace(".", ",");
+            value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+            e.target.value = value;
+        });
+    });
+
+    function moedaParaNumero(valor) {
+        valor = valor.replace(/\./g, "").replace(",", ".");
+        return parseFloat(valor);
+    }
+
+    // --- Cálculo da taxa implícita via Newton-Raphson ---
+    function calcularTaxa(pmt, pv, n) {
+        let i = 0.02;
+        for (let iter = 0; iter < 30; iter++) {
+            let f = pmt * (1 - Math.pow(1 + i, -n)) / i - pv;
+            let df = (pmt * (Math.pow(1 + i, -n) * (n / (1 + i)) - (1 - Math.pow(1 + i, -n)) / i)) / i;
+            i = i - f / df;
+        }
+        return i;
+    }
+
+    function calcular() {
+        let totalParcelas = parseInt(document.getElementById("totalParcelas").value);
+        let parcelasRestantes = parseInt(document.getElementById("parcelasRestantes").value);
+        let parcela = moedaParaNumero(document.getElementById("valorParcela").value);
+        let contratado = moedaParaNumero(document.getElementById("valorContratado").value);
+
+        let taxa = calcularTaxa(parcela, contratado, totalParcelas); 
+        let k = parcelasRestantes;
+
+        let saldo = parcela * ((Math.pow(1 + taxa, k) - 1) / taxa);
+
+        document.getElementById("taxa").innerHTML = (taxa * 100).toFixed(2) + "% ao mês";
+        document.getElementById("saldo").innerHTML = saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    }
+
+
+    //--- Exportar como PNG ---
+    function baixarPNG() {
+    const card = document.querySelector(".card");
+
+    html2canvas(card, { scale: 3 }).then(canvas => {
+        const link = document.createElement("a");
+        link.download = "simulacao_quitacao.png";
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+    });
+}
+    // ========== REGISTRO DO SERVICE WORKER ==========
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js");
+    }
+</script>
+
+</body>
+</html>
