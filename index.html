@@ -144,9 +144,11 @@
         let contratado = moedaParaNumero(document.getElementById("valorContratado").value);
 
         let taxa = calcularTaxa(parcela, contratado, totalParcelas); 
-        let k = parcelasRestantes;
+        
+        let parcelasPagas = totalParcelas - parcelasRestantes;
 
-        let saldo = parcela * ((Math.pow(1 + taxa, k) - 1) / taxa);
+        let saldo = contratado * Math.pow(1 + taxa, parcelasPagas) - parcela * ((Math.pow(1 + taxa, parcelasPagas) - 1) / taxa);
+
 
         document.getElementById("taxa").innerHTML = (taxa * 100).toFixed(2) + "% ao mês";
         document.getElementById("saldo").innerHTML = saldo.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
